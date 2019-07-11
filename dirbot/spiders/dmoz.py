@@ -1,3 +1,4 @@
+import scrapy
 from scrapy.spiders import Spider
 from scrapy.selector import Selector
 
@@ -6,13 +7,15 @@ from dirbot.items import Website
 
 class DmozSpider(Spider):
     name = "dmoz"
+    depth = 2
     allowed_domains = ["dmoz.org"]
     start_urls = [
-        "http://www.dmoz.org/Computers/Programming/Languages/Python/Books/",
-        "http://www.dmoz.org/Computers/Programming/Languages/Python/Resources/",
+        "https://www.python.org/",
     ]
 
     def parse(self, response):
+        item=None
+        print("===============")
         """
         The lines below is a spider contract. For more info see:
         http://doc.scrapy.org/en/latest/topics/contracts.html
@@ -20,17 +23,30 @@ class DmozSpider(Spider):
         @url http://www.dmoz.org/Computers/Programming/Languages/Python/Resources/
         @scrapes name
         """
-        sites = response.css('#site-list-content > div.site-item > div.title-and-desc')
-        items = []
 
-        for site in sites:
+        if 'item' in response.meta:
+            item = response.meta['item']
+
+        if item is None:
             item = Website()
-            item['name'] = site.css(
-                'a > div.site-title::text').extract_first().strip()
-            item['url'] = site.xpath(
-                'a/@href').extract_first().strip()
-            item['description'] = site.css(
-                'div.site-descr::text').extract_first().strip()
-            items.append(item)
+            item['url'] = self.start_urls[0]
+            item['depth']=0
 
-        return items
+        hxs = Selector(response)
+        hrefs = hxs.xpath("/html/body//@href").extract()
+        item['description'] = '测试'
+        item['title']= 'title'
+        yield item
+        for a in hrefs:
+            item_detail=Website()
+            item_detail['depth'] = item['depth'] + 1
+            item_detail['url'] = a
+            if item_detail['depth'] > self.depth :
+                return
+            else:
+                if a.startswith('http') and a.find('python') >= 0:
+                    yield scrapy.Request(url=a, meta={'item': item_detail}, callback=self.parse, dont_filter=True)
+                    pass
+                pass
+        pass
+    pass
